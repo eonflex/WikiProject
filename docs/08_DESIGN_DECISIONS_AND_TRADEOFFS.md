@@ -73,18 +73,76 @@ A wiki is a read-heavy, interactive application. Users expect to search, filter,
 
 ### Alternative approaches
 
-| Alternative | When it may be better |
-|---|---|
-| **Server-Side Rendering (SSR) with Next.js** | When SEO matters. Next.js renders pages on the server so search engine crawlers see real content |
-| **Plain HTML + HTMX** | When the UI is mostly server-driven and you want to avoid a JavaScript build step entirely. HTMX lets a server return HTML fragments and swap them into the page |
-| **Vue 3 or Svelte** | Smaller bundle, gentler learning curve. If the team is more comfortable with these, the tradeoffs are roughly equivalent |
-| **Blazor (WebAssembly)** | If the whole team knows C#, Blazor lets you write the frontend in C#. Slower initial load, but a single language across the stack |
+#### Angular
+
+Angular is maintained by Google and is React's largest direct competitor for building complex SPAs. Unlike React (which is a library), Angular is a full framework: it comes with an opinionated router, HTTP client, form handling, dependency injection, and testing utilities all built in. It uses TypeScript by default and has been doing so since version 2 — longer than React's ecosystem standardised on TypeScript.
+
+**When Angular may be better:**
+- Large enterprise teams where strict architectural conventions matter more than flexibility. Angular's opinions mean less debate about folder structure, state management, or routing.
+- Organisations that already have Angular expertise and established tooling (e.g., Angular Material, Angular CLI code generation).
+- Projects with complex form-heavy UIs (Angular's reactive forms and template-driven forms are more mature out of the box than React's ecosystem).
+
+**When React is better than Angular for this project:**
+- React has a smaller mental model. You learn a handful of hooks (`useState`, `useEffect`, `useCallback`) and you are productive. Angular requires understanding modules, decorators, services, pipes, directives, change detection, and RxJS Observables before you can do basic things.
+- React's ecosystem is broader and more active for the specific libraries this project would need (Markdown editors, rich text components, date pickers).
+- The JSX model — writing HTML-like syntax inside JavaScript — feels more natural for developers already comfortable with TypeScript.
+
+#### Vue 3
+
+Vue is the framework this company already uses in production, making a detailed comparison especially relevant.
+
+Vue and React solve the same problem — reactive component-based UIs — but with meaningfully different philosophies:
+
+| | React | Vue 3 |
+|---|---|---|
+| **Template syntax** | JSX: HTML written inside JavaScript functions | Single File Components (SFCs): `<template>`, `<script>`, `<style>` in one `.vue` file |
+| **Mental model** | Functions and closures. A component is a function that returns JSX | Options API or Composition API. Closer to traditional object-oriented thinking |
+| **Two-way binding** | Explicit: `value={state}` + `onChange` handler required for every input | `v-model` handles two-way binding on inputs automatically — less ceremony for forms |
+| **State model** | `useState` + `useReducer`. Fine-grained; you control everything | `ref()` and `reactive()` — broadly similar to hooks, but often considered more readable |
+| **Learning curve** | Steeper initially. Hooks have non-obvious rules (stale closures, dependency arrays) | Gentler. Options API maps closely to how developers already think about object properties vs methods |
+| **Ecosystem size** | Larger — more npm packages, more tutorials, larger job market | Smaller, but complete. All essential libraries exist |
+| **Flexibility vs structure** | Library: you choose your router, state management, etc. | Framework-lite: Vue Router and Pinia (state) are the de facto standard but not mandatory |
+
+**When Vue may be better than React:**
+- The team already knows Vue well and onboarding cost matters.
+- The project has lots of form-heavy screens where `v-model` reduces boilerplate significantly.
+- Template-style separation of concerns feels more maintainable to the team than JSX.
+
+**When React is better than Vue for this project:**
+- React's ecosystem advantage is most visible for rich text editing, Markdown rendering, and complex data display components — all things a wiki may need in the future.
+- React's job market is larger, making hiring easier if the team grows.
+- This project's existing codebase is React; switching would require a complete rewrite with no functional improvement for end users.
+
+#### Next.js (React with SSR)
+
+Not a different framework — Next.js is React with a file-based routing convention and server-side rendering baked in. When SEO matters (public-facing wiki), Next.js is the natural upgrade path from this project.
+
+#### Plain HTML + HTMX
+
+When the UI is mostly server-driven and you want to avoid a JavaScript build step entirely. HTMX lets a server return HTML fragments and swap them into the page. Excellent for internal tools with simple interactivity; not suitable for the kind of real-time filtering and state management this wiki uses.
+
+#### Svelte
+
+Svelte compiles components to vanilla JavaScript at build time — there is no framework runtime shipped to the browser. The result is smaller bundles and often faster runtime performance. The tradeoff is a smaller ecosystem and fewer developers who know it.
+
+#### Blazor (WebAssembly or Server)
+
+Blazor allows writing frontend code in C# instead of JavaScript. It is worth being honest about where it fits and where it does not.
+
+**Blazor WebAssembly** ships the entire .NET runtime to the browser (~5–15 MB). Initial load is slow, and the browser performance for DOM-intensive UIs is lower than native JavaScript frameworks. The ecosystem of Blazor UI component libraries is a fraction of what exists for React or Vue.
+
+**Blazor Server** keeps all UI state on the server and uses a WebSocket to push DOM diff updates to the browser. This eliminates the large download but means the server must maintain an active WebSocket connection per user, which does not scale cheaply.
+
+Blazor is worth considering only in a narrow scenario: an internal-only application (load time does not matter to end users), the organisation has zero interest in maintaining JavaScript or TypeScript skills at all, and the audience is small enough that Blazor Server's per-connection memory cost is not a concern. Using "the backend team knows C#" as a justification misses the point: React with TypeScript is learnable by any developer in days, and the frontend ecosystem's breadth — regardless of your backend language — is an enormous practical advantage. Blazor's value is not in avoiding TypeScript; it is in very specific scenarios where a unified C# stack genuinely simplifies deployment or code sharing (e.g., sharing validation logic between frontend and backend in C#).
+
+For this project and most public or team-facing wikis, Blazor is not the right tool.
 
 ### What would justify revisiting this decision
 
 - The wiki becomes public-facing and SEO becomes important → migrate to Next.js for SSR.
-- The development team is entirely C# developers with no JavaScript experience → consider Blazor.
-- Bundle size becomes a meaningful concern (e.g., targeting very slow network regions) → consider Svelte or a lighter framework.
+- Bundle size becomes a meaningful concern (e.g., targeting very slow network regions) → consider Svelte.
+- The team already works heavily in Vue and has established Vue tooling → Vue 3 with Vite would be an equivalent choice with lower team onboarding cost.
+- The project needs Angular's enterprise structure (large team, strict conventions, complex forms) → Angular is the primary alternative to React for large-scale SPAs.
 
 ---
 
