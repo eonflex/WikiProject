@@ -43,14 +43,59 @@
 
 ## 1. Read These First
 
-Before diving into any folder, read these four files. They give you the entire mental model in about 30 minutes.
+Do not open any files yet. Read this section first, then use the files below to confirm what you have just learned.
 
-| Order | File | Why |
-|-------|------|-----|
-| 1 | `README.md` | Project overview, tech stack, and how to start both servers locally. Read this before you run anything. |
-| 2 | `src/WikiProject.Api/Program.cs` | Tiny (~80 lines) but it is the backbone of the backend. Every service, database connection, and middleware is wired up here. |
-| 3 | `frontend/src/App.tsx` | Shows you every URL the frontend knows about (~25 lines). If you want to know what pages exist, start here. |
-| 4 | `frontend/src/types/index.ts` | Defines the shape of every piece of data that flows between frontend and backend. Read this and you understand the data model instantly. |
+### What this app actually does
+
+WikiProject is an internal knowledge base — think of it as a private wiki where a team can write, search, and manage articles. The main things it can do are:
+
+- Create, read, update, and delete articles (basic CRUD)
+- Tag articles and assign them a category
+- Search across article titles, summaries, content, and tags
+- Filter articles by status (Draft, Published, Archived) or by category/tag
+- Paginate through results
+
+There is no authentication yet. Any visitor can do anything.
+
+### The shape of the codebase
+
+The repository contains **two completely separate programs** that live in the same folder and talk to each other over HTTP:
+
+```
+WikiProject/
+├── src/       ← A .NET 10 web API (C#). Handles data, business logic, and the database.
+└── frontend/  ← A React 19 single-page app (TypeScript). Handles the UI.
+```
+
+Neither half knows how the other is built. The only thing connecting them is a set of HTTP endpoints (e.g., `GET /api/articles`). This is intentional — it means you could replace the frontend with a mobile app, or swap the backend for a Node.js server, without touching the other side.
+
+### How data flows through the system
+
+Here is the path a piece of data takes from a click in the browser to the database and back — in plain English:
+
+1. **User interacts** with a React component in the browser.
+2. A **React hook** (`useArticles.ts`, `useArticle.ts`) calls a function on the **service layer** (`articleService.ts`).
+3. The service makes an **HTTP request** (via Axios) to a URL like `GET /api/articles?search=authentication`.
+4. The **ASP.NET Core controller** (`ArticlesController.cs`) receives that request and calls the **service layer** on the backend (`ArticleService.cs`).
+5. The backend service queries the **SQLite database** through Entity Framework Core (`WikiDbContext.cs`).
+6. The database returns rows; EF Core turns them into C# objects (entities).
+7. The entities are **mapped** to DTOs (`ArticleMappings.cs`) — simpler data shapes safe to send over the wire.
+8. The controller serializes the DTOs to **JSON** and responds with `200 OK`.
+9. Axios receives the JSON; the hook stores it in React state.
+10. React **re-renders** the component with the new data.
+
+Every feature in this codebase follows this same path. Once you understand it for one feature, you understand all of them.
+
+### Now open these files as anchors
+
+With that mental model in mind, these four files are worth a quick look — not to read deeply yet, but to see the skeleton described above in real code. Each one is short and focused:
+
+- **`README.md`** — The project overview. Confirms the tech stack and shows you how to start both servers. Skim the API route table at the end.
+- **`src/WikiProject.Api/Program.cs`** (~80 lines) — The backend wiring file. You will see the database connection, the CORS setup, and every service being registered. Do not worry about what each line means yet; the [Backend Tour](#4-backend-tour--srcwikiprojectapi) explains it all. Just notice how compact it is.
+- **`frontend/src/App.tsx`** (~25 lines) — The frontend route map. Every URL the app knows about is defined here. It tells you what pages exist before you look at any of them.
+- **`frontend/src/types/index.ts`** (~50 lines) — The data model, expressed as TypeScript interfaces. `Article`, `ArticleSummary`, `CreateArticleRequest` — these are the nouns of the whole system. Seeing them here helps you read everything else.
+
+Return to these files as reference points while working through the rest of this tour.
 
 ---
 
