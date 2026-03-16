@@ -67,8 +67,8 @@ dotnet run
 ```
 
 The API will be available at:
-- **API base:** `http://localhost:5000`
-- **Swagger UI:** `http://localhost:5000/swagger`
+- **API base:** `http://localhost:5018`
+- **Swagger UI:** `http://localhost:5018/swagger`
 
 ### Frontend
 
@@ -84,7 +84,7 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`.
 
-> The Vite dev server proxies `/api` requests to `http://localhost:5000`, so no CORS issues during development.
+> The Vite dev server proxies `/api` requests to `http://localhost:5018`, so no CORS issues during development.
 
 ## Applying Migrations
 
