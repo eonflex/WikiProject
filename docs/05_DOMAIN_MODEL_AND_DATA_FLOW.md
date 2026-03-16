@@ -3,15 +3,16 @@
 ## Table of Contents
 
 1. [Introduction and Purpose](#introduction-and-purpose)
-2. [Core Domain Concepts](#core-domain-concepts)
+2. [The MVC Pattern and WikiProject](#the-mvc-pattern-and-wikiproject)
+3. [Core Domain Concepts](#core-domain-concepts)
    - [Article](#article)
    - [Category](#category)
    - [Tag](#tag)
    - [ArticleStatus](#articlestatus)
    - [Slug](#slug)
    - [Metadata: CreatedAt and UpdatedAt](#metadata-createdat-and-updatedat)
-3. [Relationships Between Concepts](#relationships-between-concepts)
-4. [How Concepts Are Represented in Code and Data](#how-concepts-are-represented-in-code-and-data)
+4. [Relationships Between Concepts](#relationships-between-concepts)
+5. [How Concepts Are Represented in Code and Data](#how-concepts-are-represented-in-code-and-data)
    - [Database Layer](#database-layer)
    - [EF Core Entities](#ef-core-entities)
    - [Data Transfer Objects (DTOs)](#data-transfer-objects-dtos)
@@ -19,17 +20,17 @@
    - [API Response JSON](#api-response-json)
    - [Frontend TypeScript Types](#frontend-typescript-types)
    - [Rendered UI](#rendered-ui)
-5. [Search and Filtering Concepts](#search-and-filtering-concepts)
-6. [End-to-End Example: One Article Through the Full Stack](#end-to-end-example-one-article-through-the-full-stack)
+6. [Search and Filtering Concepts](#search-and-filtering-concepts)
+7. [End-to-End Example: One Article Through the Full Stack](#end-to-end-example-one-article-through-the-full-stack)
    - [Creating an Article (POST)](#creating-an-article-post)
    - [Reading an Article (GET)](#reading-an-article-get)
    - [Updating an Article (PUT)](#updating-an-article-put)
-7. [Why Data Transformations Happen Between Layers](#why-data-transformations-happen-between-layers)
-8. [What Bugs This Separation Helps Avoid](#what-bugs-this-separation-helps-avoid)
-9. [Where Serialization Happens](#where-serialization-happens)
-10. [How Validation Protects the System](#how-validation-protects-the-system)
-11. [How Updates Propagate Through the Stack](#how-updates-propagate-through-the-stack)
-12. [Summary and Next Steps](#summary-and-next-steps)
+8. [Why Data Transformations Happen Between Layers](#why-data-transformations-happen-between-layers)
+9. [What Bugs This Separation Helps Avoid](#what-bugs-this-separation-helps-avoid)
+10. [Where Serialization Happens](#where-serialization-happens)
+11. [How Validation Protects the System](#how-validation-protects-the-system)
+12. [How Updates Propagate Through the Stack](#how-updates-propagate-through-the-stack)
+13. [Summary and Next Steps](#summary-and-next-steps)
 
 ---
 
@@ -49,13 +50,74 @@ Understanding these questions gives you a mental map of the whole system. Once y
 
 ---
 
+## The MVC Pattern and WikiProject
+
+**MVC** stands for **Model-View-Controller**. It is one of the most widely used design patterns in web development. Understanding it unlocks a lot of vocabulary you will encounter in documentation, tutorials, and code reviews — so it is worth learning here before diving into the specific domain objects.
+
+The core idea is to separate an application into three distinct roles:
+
+- **Model** — the data and the rules that govern it. What does an article look like? What fields does it have? What constraints apply? How is it stored and retrieved?
+- **View** — the presentation. What does the user see? How is the data rendered to the screen?
+- **Controller** — the intermediary. It receives user input (an HTTP request), asks the Model for data or instructs it to change, then returns a result to the View (or the API caller).
+
+This separation of concerns is valuable because it prevents any one piece of code from knowing too much. A View should not directly query a database. A Model should not know what color its text is rendered in. A Controller should not contain complex business rules.
+
+### How WikiProject Maps to MVC
+
+WikiProject uses ASP.NET Core on the backend and React on the frontend — each with their own conventions — but the three MVC roles are clearly visible across the stack:
+
+| MVC Role | WikiProject Representation | Location |
+|----------|---------------------------|----------|
+| **Model** | `Article`, `Tag`, `ArticleTag`, `ArticleStatus` entity classes | `src/WikiProject.Api/Entities/` |
+| **Controller** | `ArticlesController`, `MetadataController` | `src/WikiProject.Api/Controllers/` |
+| **View** | React page and component files | `frontend/src/pages/`, `frontend/src/components/` |
+
+#### The Model — `Article`, `Tag`, and Friends
+
+The domain objects described in [Core Domain Concepts](#core-domain-concepts) below are the **Models** of this application. In MVC terminology, a Model represents:
+
+- The **shape of the data** — what fields an article has, what types they are
+- The **business rules** — a slug must be unique; a status must be Draft, Published, or Archived; timestamps must be set by the server
+- The **persistence mapping** — how EF Core translates C# properties into database rows and columns
+
+In WikiProject, the C# entity classes (`Article.cs`, `Tag.cs`, `ArticleTag.cs`) are the canonical Models. When tutorials or documentation say "define your Model," they mean exactly these kinds of classes. The DTOs (`ArticleDto`, `CreateArticleRequest`, etc.) are closely related but serve a different role — they define the **shape of the API contract** rather than the shape of the stored data. See [Data Transfer Objects (DTOs)](#data-transfer-objects-dtos) for more on this distinction.
+
+#### The Controller — `ArticlesController`
+
+`ArticlesController` is the **Controller** in MVC. It:
+
+1. Receives an incoming HTTP request (e.g., `POST /api/articles`)
+2. Validates the input using FluentValidation
+3. Delegates business logic to the service layer, which works with the Models
+4. Returns an HTTP response with the result
+
+Controllers in WikiProject do not contain business logic themselves — they hand off to `ArticleService`. This is a refinement of classic MVC sometimes called the **service layer pattern** or **thin controller** approach: keep controllers lean and push logic into dedicated service classes.
+
+#### The View — React Components
+
+On the frontend, React components like `ArticleCard`, `ArticleDetailPage`, and `ArticlesPage` are the **Views** in MVC. They receive data and render HTML for the browser. They do not fetch data directly from the database — they receive it through the API, just as a traditional View receives it from a Controller.
+
+> **Common beginner confusion:** In classic server-rendered MVC frameworks (like ASP.NET Core MVC with Razor Pages, or Ruby on Rails), the Controller directly populates the View in the same process on the same server. In WikiProject's architecture, the backend Controller speaks JSON over HTTP to the frontend, and the React View is a separate JavaScript application running in the browser. This is called an **API-first** or **SPA + API** (Single Page Application + API) architecture. The MVC roles still apply, but they now span a network boundary. The benefit is that the same API can serve mobile apps, third-party integrations, or future clients — not just the React frontend.
+
+### Why This Pattern Matters
+
+When you open any file in this project, knowing its MVC role tells you immediately what it should and should not do:
+
+- If you are in `Article.cs` (Model), you are looking at data structure. No HTTP, no rendering.
+- If you are in `ArticlesController.cs` (Controller), you are handling HTTP routing and delegating to services. No complex SQL, no HTML.
+- If you are in `ArticleDetailPage.tsx` (View), you are rendering UI and handling user events. No direct DB calls.
+
+Violations of these boundaries are a common source of bugs and maintainability problems in larger codebases.
+
+---
+
 ## Core Domain Concepts
 
-A **domain** is the real-world subject area an application works with. The domain here is "a knowledge base full of team documentation." Domain concepts are the things that matter to users: articles, categories, tags, and so on.
+A **domain** is the real-world subject area an application works with. The domain here is "a knowledge base full of team documentation." Domain concepts are the things that matter to users: articles, categories, tags, and so on. In MVC terms, these are your **Models**.
 
 ### Article
 
-An **article** is the primary unit of content. It is a document written by a team member to capture knowledge — instructions, reference material, architectural notes, or how-to guides.
+An **article** is the primary unit of content — and the central **Model** of this application. It is a document written by a team member to capture knowledge — instructions, reference material, architectural notes, or how-to guides.
 
 An article has these properties:
 
@@ -388,6 +450,8 @@ The composite primary key `(ArticleId, TagId)` prevents duplicate tag associatio
 **EF Core** (Entity Framework Core) is the **ORM** (Object-Relational Mapper) used in this project. An ORM is a library that translates between the object model in your code (C# classes) and the relational model in the database (tables and rows). Instead of writing SQL by hand, you work with regular C# objects and EF Core generates the SQL for you.
 
 Each database table corresponds to a C# **entity** class. An entity is just a plain C# class — it has no special base class or marker interface. EF Core learns about entities through the `DbContext`.
+
+> **MVC connection:** These entity classes are the **Models** in MVC. They live in `src/WikiProject.Api/Entities/` and represent the authoritative definition of the data the application manages. Everything else in the stack — DTOs, TypeScript interfaces, React components — is ultimately derived from or shaped by these classes.
 
 **`Article.cs`**
 
@@ -758,6 +822,8 @@ This converts `"2026-03-15T02:27:47.078Z"` into something like `"Mar 15, 2026"` 
 ### Rendered UI
 
 The final destination of the article data is the browser's DOM (Document Object Model — the in-memory tree of HTML elements that the browser renders to screen).
+
+> **MVC connection:** React pages and components are the **Views** in MVC. They live in `frontend/src/pages/` and `frontend/src/components/`. Their job is purely presentational: take data and produce HTML. They do not contain business rules or talk directly to the database.
 
 **Article list view** (`ArticlesPage.tsx` + `ArticleCard.tsx`):
 
@@ -1453,7 +1519,8 @@ These are not currently implemented. `STARTING_TASKS.md` lists real-time feature
 
 ### What you learned in this document
 
-- **Article** is the central concept. All other concepts (Category, Tag, Status, Slug, Metadata) are properties of or relationships to Articles.
+- **MVC (Model-View-Controller)** is the organizing design pattern. `Article`, `Tag`, and other entity classes are the **Models**; `ArticlesController` is the **Controller**; React pages and components are the **Views**.
+- **Article** is the central Model. All other concepts (Category, Tag, Status, Slug, Metadata) are properties of or relationships to Articles.
 - **Category** is a plain text field — simple, with the tradeoff of possible inconsistency.
 - **Tags** use a proper many-to-many relationship with a join table, enabling multi-label classification and efficient querying.
 - **Status** is an enum stored as an integer in the database and serialized as a string in API responses.
@@ -1480,6 +1547,7 @@ These are not currently implemented. `STARTING_TASKS.md` lists real-time feature
 
 ### Recommended further reading
 
+- [MVC design pattern — Microsoft documentation](https://learn.microsoft.com/en-us/aspnet/core/mvc/overview)
 - [Entity Framework Core documentation — Relationships](https://learn.microsoft.com/en-us/ef/core/modeling/relationships)
 - [FluentValidation documentation](https://docs.fluentvalidation.net/)
 - [System.Text.Json serialization documentation](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/overview)
